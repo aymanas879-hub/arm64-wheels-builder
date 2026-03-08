@@ -1,0 +1,47 @@
+name: Build ARM64 Wheels
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    
+    strategy:
+      matrix:
+        library: [sentencepiece]
+        python-version: ['3.13']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential cmake rustc cargo
+        
+    - name: Build sentencepiece for ARM64
+      run: |
+        mkdir -p wheels
+        pip install --upgrade pip wheel setuptools
+        git clone https://github.com/google/sentencepiece
+        cd sentencepiece
+        mkdir build && cd build
+        cmake .. -DCMAKE_C_FLAGS="-march=armv8-a" -DCMAKE_CXX_FLAGS="-march=armv8-a"
+        make -j2
+        cd ../python
+        pip wheel . --wheel-dir=../../wheels/
+    
+    - name: Upload wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: sentencepiece-arm64-wheel
+        path: ./wheels/*.whl
